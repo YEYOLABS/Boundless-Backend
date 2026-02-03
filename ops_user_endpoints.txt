@@ -1,0 +1,105 @@
+# Ops User Endpoints and Request Bodies
+
+The ops user (username: 'ops1', pin: '3333', role: 'ops', organisationId: 'org1', uid: 'ops1', name: 'Ops User') can access the following endpoints:
+
+## Authentication
+- **Route:** `POST /authenticate`
+- **Request Body:**
+  ```json
+  {
+    "username": "string",
+    "pin": "string"
+  }
+  ```
+
+## Secrets
+- **Route:** `GET /secrets`
+- **Request Body:** None
+
+## Inspection Items
+- **Route:** `GET /get-inspection-items`
+- **Query Parameters:**
+  - `type`: string (e.g., "daily", "pre_tour", "post_tour")
+- **Request Body:** None
+
+## Tours
+- **Route:** `POST /tours`
+- **Request Body:**
+  ```json
+  {
+    "driverId": "string",
+    "vehicleId": "string",
+    "startDate": "string",
+    "endDate": "string",
+    "status": "string" (optional, defaults to "planned")
+  }
+  ```
+
+- **Route:** `PATCH /tours/:id`
+- **Request Body:**
+  ```json
+  {
+    "driverId": "string" (optional),
+    "vehicleId": "string" (optional),
+    "startDate": "string" (optional),
+    "endDate": "string" (optional),
+    "status": "string" (optional)
+  }
+  ```
+
+- **Route:** `GET /tours`
+- **Query Parameters:**
+  - `status`: string (optional)
+- **Request Body:** None
+
+- **Route:** `GET /tours/:id`
+- **Request Body:** None
+
+## Inspections
+- **Route:** `GET /tours/:tourId/inspections`
+- **Request Body:** None
+
+## Issues
+- **Route:** `POST /issues`
+- **Request Body:**
+  ```json
+  {
+    "vehicleId": "string",
+    "severity": "string",
+    "description": "string",
+    "imageUrl": "string" (optional),
+    "tourId": "string" (optional)
+  }
+  ```
+
+- **Route:** `GET /issues`
+- **Request Body:** None
+
+## Floats
+- **Route:** `POST /floats`
+- **Request Body:**
+  ```json
+  {
+    "driverId": "string",
+    "amountCents": "number",
+    "tourId": "string" (optional)
+  }
+  ```
+
+- **Route:** `PATCH /floats/:id/close`
+- **Request Body:** None
+
+- **Route:** `GET /floats`
+- **Request Body:** None
+
+## Expenses
+- **Route:** `PATCH /expenses/:id/status`
+- **Request Body:**
+  ```json
+  {
+    "action": "string" (e.g., "approve", "reject")
+  }
+  ```
+
+- **Route:** `GET /expenses`
+- **Request Body:** None
