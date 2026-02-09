@@ -731,8 +731,23 @@ export const listIssues = async (req: Request, res: Response): Promise<Response 
         return res.status(403).json({ message: 'Forbidden', status: 0, data: null });
     }
 
-    const data = await queryDocumentsByFilters('issues', filters);
-    res.status(200).json({ message: 'Issues fetched', status: 1, data });
+    const issues = await queryDocumentsByFilters('issues', filters);
+    
+    // Enrich issues with vehicle names
+    const enrichedIssues = await Promise.all(
+        issues.map(async (issue: any) => {
+            if (issue.vehicleId) {
+                const vehicle = await getDocument('vehicles', issue.vehicleId);
+                return {
+                    ...issue,
+                    vehicleName: vehicle ? `${vehicle.model} (${vehicle.licenceNumber})` : 'Unknown Vehicle'
+                };
+            }
+            return { ...issue, vehicleName: 'Unknown Vehicle' };
+        })
+    );
+    
+    res.status(200).json({ message: 'Issues fetched', status: 1, data: enrichedIssues });
 };
 
 // Floats
@@ -1141,8 +1156,30 @@ export const getDrivers = async (req: Request, res: Response): Promise<Response 
         { field: 'role', op: '==', value: 'driver' }
     ];
 
-    const data = await queryDocumentsByFilters('users', filters);
-    res.status(200).json({ message: 'Drivers fetched', status: 1, data });
+    const drivers = await queryDocumentsByFilters('users', filters);
+    
+    // Get all vehicles to match drivers with their vehicle's sortOrder
+    const vehicleFilters: { field: string; op: any; value: any }[] = [
+        { field: 'organisationId', op: '==', value: user.organisationId }
+    ];
+    const vehicles = await queryDocumentsByFilters('vehicles', vehicleFilters);
+    
+    // Create a map of driverId to vehicle sortOrder
+    const driverSortOrderMap = new Map<string, number>();
+    (vehicles as any[]).forEach((vehicle: any) => {
+        if (vehicle.currentDriverId && vehicle.sortOrder !== undefined) {
+            driverSortOrderMap.set(vehicle.currentDriverId, vehicle.sortOrder);
+        }
+    });
+    
+    // Sort drivers by their vehicle's sortOrder (drivers without vehicles go to the end)
+    const sortedDrivers = (drivers as any[]).sort((a, b) => {
+        const orderA = driverSortOrderMap.get(a.uid) ?? Number.MAX_SAFE_INTEGER;
+        const orderB = driverSortOrderMap.get(b.uid) ?? Number.MAX_SAFE_INTEGER;
+        return orderA - orderB;
+    });
+    
+    res.status(200).json({ message: 'Drivers fetched', status: 1, data: sortedDrivers });
 };
 
 export const getVehicleById = async (req: Request, res: Response): Promise<Response | void> => {
@@ -1215,8 +1252,16 @@ export const getIssuesForVehicle = async (req: Request, res: Response): Promise<
         return res.status(403).json({ message: 'Vehicle does not belong to organisation', status: 0, data: null });
     }
 
-    const data = await queryDocumentsByFilters('issues', [{ field: 'vehicleId', op: '==', value: vehicleId }]);
-    res.status(200).json({ message: 'Success', status: 1, data });
+    const issues = await queryDocumentsByFilters('issues', [{ field: 'vehicleId', op: '==', value: vehicleId }]);
+    
+    // Enrich issues with vehicle name
+    const vehicleName = `${vehicle.model} (${vehicle.licenceNumber})`;
+    const enrichedIssues = issues.map((issue: any) => ({
+        ...issue,
+        vehicleName
+    }));
+    
+    res.status(200).json({ message: 'Success', status: 1, data: enrichedIssues });
 };
 
 export const getInspectionsForVehicle = async (req: Request, res: Response): Promise<Response | void> => {
