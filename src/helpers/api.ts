@@ -148,8 +148,15 @@ export const getAssignedTask = async (driverId: string): Promise<{ vehicle: any;
         const floats = floatQuery.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
 
         const float:any = floats.length > 0 ? floats[0] : null; // Assuming one float per tour
-        console.log({ vehicle, tour, float })
-        return { vehicle, tour, float:{...float,remainingAmount:float?.remainingAmount / 100, originalAmount:float?.originalAmount / 100} };
+        console.log('[getAssignedTask] Returning data:');
+        console.log('  - vehicle:', vehicle?.id);
+        console.log('  - tour:', tour?.id);
+        console.log('  - float:', float?.id);
+        console.log('  - float.originalAmount (cents):', float?.originalAmount);
+        console.log('  - float.remainingAmount (cents):', float?.remainingAmount);
+        
+        // Return data as-is from database (in cents)
+        return { vehicle, tour, float };
     } catch (e) {
         console.error(e);
         return null;

@@ -1,0 +1,22 @@
+{
+  "vehicleSortOrder": [
+    { "id": "CFM82160", "sortOrder": 1, "driver": "Joseph" },
+    { "id": "CFM84543", "sortOrder": 2, "driver": "Donald" },
+    { "id": "CFM82152", "sortOrder": 3, "driver": "Malcolm" },
+    { "id": "CFM80581", "sortOrder": 4, "driver": "Patrick" },
+    { "id": "CFM71365", "sortOrder": 5, "driver": "David" },
+    { "id": "CFM41869", "sortOrder": 6, "driver": "Gladweil" },
+    { "id": "CFM92343", "sortOrder": 7, "driver": "Richard" },
+    { "id": "CFM92350", "sortOrder": 8, "driver": "Siya" },
+    { "id": "CFM74490", "sortOrder": 9, "driver": "Eric" },
+    { "id": "CFM86383", "sortOrder": 10, "driver": "Chris" },
+    { "id": "CFM67197", "sortOrder": 11, "driver": "Matt" },
+    { "id": "CFM70894", "sortOrder": 12, "driver": "Nathaniel" },
+    { "id": "CFM67364", "sortOrder": 13, "driver": "Thabo" },
+    { "id": "CFM70901", "sortOrder": 14, "driver": "Victor" },
+    { "id": "CFM94784", "sortOrder": 15, "driver": "Colin" },
+    { "id": "CFM15654", "sortOrder": 16, "driver": "Paul" },
+    { "id": "CFM68711", "sortOrder": 17, "driver": "Nelson" },
+    { "id": "CFM68413", "sortOrder": 18, "driver": "Spare" }
+  ]
+}

@@ -191,19 +191,6 @@ export const inspection_types = [
                 ]
             },
             {
-                key: 'brake_pad_thickness',
-                name: 'Brake Pad Thickness (mm)',
-                inputType: 'number_group',
-                mandatory: true,
-                safetyCritical: true,
-                fields: [
-                    'left_front',
-                    'right_front',
-                    'left_rear',
-                    'right_rear'
-                ]
-            },
-            {
                 key: 'trailer_tread_depth',
                 name: 'Trailer Tyre Tread Depth (mm)',
                 inputType: 'number_group',
@@ -242,18 +229,6 @@ export const inspection_types = [
                     'left_rear_outer',
                     'right_rear_inner',
                     'right_rear_outer'
-                ]
-            },
-            {
-                key: 'brake_pad_thickness',
-                name: 'Brake Pad Thickness (mm)',
-                inputType: 'number_group',
-                mandatory: true,
-                fields: [
-                    'left_front',
-                    'right_front',
-                    'left_rear',
-                    'right_rear'
                 ]
             },
             {

@@ -5,7 +5,10 @@
     "main": "src/server.ts",
     "scripts": {
         "build": "tsc",
-        "test": "jest --config jest.config.ts --detectOpenHandles --coverage --maxWorkers=1"
+        "test": "jest --config jest.config.ts --detectOpenHandles --coverage --maxWorkers=1",
+        "view-db": "ts-node scripts/viewDatabaseValues.ts",
+        "convert-to-rands": "ts-node scripts/convertCentsToRands.ts",
+        "update-vehicle-sort": "ts-node scripts/updateVehiclesSortOrder.ts"
     },
     "keywords": [
         "decorators",

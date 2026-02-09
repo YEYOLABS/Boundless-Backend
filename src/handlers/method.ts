@@ -49,6 +49,9 @@ const requireRole = (res: Response, role: Role, allowed: Role[]) => {
 export const getInspectionItems = async (req: Request, res: Response): Promise<Response | void> => {
     const type = req.query.type as string;
     try {
+        if (!type) {
+            return res.status(200).json(inspection_types);
+        }
         const items = inspection_types.find((item) => item.type === type);
         res.status(200).json(items);
     } catch (error) {
@@ -59,7 +62,7 @@ export const getTaskAssigned = async (req: Request, res: Response): Promise<Resp
     const user = ensureUser(req, res);
     if (!user) return;
     try {
-       const response = await getAssignedTask(user?.uid);
+        const response = await getAssignedTask(user?.uid);
         res.status(200).json({ message: 'successfull fetched driver task', status: 0, data: response });
     } catch (error) {
         res.status(500).json({ message: 'Something went wrong', status: 0, data: null });
@@ -411,10 +414,27 @@ export const submitInspection = async (req: Request, res: Response): Promise<Res
         return res.status(400).json({ message: 'Results must be an array', status: 0, data: null });
     }
 
+    // Transform tyre measurements from comma-separated strings to arrays with field labels
+    const transformedResults = results.map((result) => {
+        if (result.key === 'tyre_tread_depth' && typeof result.value === 'string') {
+            const values = result.value.split(',').map(v => parseFloat(v.trim()));
+            const fields = ['left_front', 'right_front', 'left_rear_inner', 'left_rear_outer', 'right_rear_inner', 'right_rear_outer'];
+            const tyreMeasurements = fields.map((field, index) => ({
+                position: field,
+                value: values[index] || 0
+            }));
+            return {
+                ...result,
+                value: tyreMeasurements
+            };
+        }
+        return result;
+    });
+
     const safetyFailures = template.items
         .filter((item) => 'safetyCritical' in item && item.safetyCritical)
         .filter((item) => {
-            const match = results.find((r) => r.key === item.key);
+            const match = transformedResults.find((r) => r.key === item.key);
             return match ? match.value === false : true;
         });
 
@@ -425,7 +445,7 @@ export const submitInspection = async (req: Request, res: Response): Promise<Res
         organisationId: user.organisationId,
         driverId: user.uid,
         type,
-        results,
+        results: transformedResults,
         safetyFailures,
         createdAt: now,
         updatedAt: now
@@ -634,8 +654,8 @@ export const issueFloat = async (req: Request, res: Response): Promise<Response 
         organisationId: user.organisationId,
         driverId,
         tourId: tourId ?? null,
-        originalAmount: amountCents,
-        remainingAmount: amountCents,
+        originalAmount: amountCents, // Store in cents
+        remainingAmount: amountCents, // Store in cents
         active: true,
         issuedBy: user.uid,
         message: message || null,
@@ -691,6 +711,17 @@ export const createExpense = async (req: Request, res: Response): Promise<Respon
     if (!requireRole(res, user.role, ['driver'])) return;
 
     const { category, amountCents, receiptUrl, tourId, floatId, description } = req.body;
+    
+    console.log('[createExpense] Request received:', {
+        category,
+        amountCents,
+        tourId,
+        floatId,
+        description,
+        hasReceiptUrl: !!receiptUrl,
+        user: user.uid
+    });
+    
     // Upload receipt image if provided
     let receiptDownloadUrl: string | null = null;
     if (receiptUrl) {
@@ -740,15 +771,27 @@ export const createExpense = async (req: Request, res: Response): Promise<Respon
                 throw new Error('FLOAT_MISSING');
             }
             const floatData = freshFloat.data() as any;
-            console.log(floatData)
+            console.log('[createExpense] Float data:', {
+                id: floatId,
+                organisationId: floatData.organisationId,
+                driverId: floatData.driverId,
+                remainingAmount: floatData.remainingAmount,
+                amountCents: amountCents
+            });
+            
             if (floatData.organisationId !== user.organisationId || floatData.driverId !== user.uid) {
-                console.log('FLOAT_INVALID')
+                console.log('[createExpense] FLOAT_INVALID - org or driver mismatch');
+                console.log('  Expected org:', user.organisationId, 'Got:', floatData.organisationId);
+                console.log('  Expected driver:', user.uid, 'Got:', floatData.driverId);
                 throw new Error('FLOAT_INVALID');
             }
             if (floatData.remainingAmount < amountCents) {
-                console.log('INSUFFICIENT_FUNDS')
+                console.log('[createExpense] INSUFFICIENT_FUNDS');
+                console.log('  Remaining:', floatData.remainingAmount, 'Requested:', amountCents);
                 throw new Error('INSUFFICIENT_FUNDS');
             }
+
+            console.log('[createExpense] Validation passed, creating expense...');
 
             const expenseRef = createDocRef('expenses');
             transaction.set(expenseRef, {
@@ -757,7 +800,7 @@ export const createExpense = async (req: Request, res: Response): Promise<Respon
                 floatId,
                 tourId,
                 category,
-                amount: amountCents,
+                amount: amountCents, // Store in cents
                 receiptUrl: receiptDownloadUrl ?? null,
                 description: description || '',
                 vehicleLicence,
@@ -770,18 +813,27 @@ export const createExpense = async (req: Request, res: Response): Promise<Respon
 
             const adjustment = category === 'WIFI' ? amountCents : -amountCents;
             transaction.update(floatRef, {
-                remainingAmount: floatData.remainingAmount + adjustment,
+                remainingAmount: floatData.remainingAmount + adjustment, // Update in cents
                 updatedAt: now
             });
         });
 
         res.status(201).json({ message: 'Expense created', status: 1 });
     } catch (error: any) {
+        console.error('[createExpense] Error:', error);
         if (error?.message === 'INSUFFICIENT_FUNDS') {
-            console.log('Insufficient float balance')
+            console.log('[createExpense] Returning insufficient funds error');
             return res.status(400).json({ message: 'Insufficient float balance', status: 0, data: null });
         }
-        console.log('No bosss')
+        if (error?.message === 'FLOAT_INVALID') {
+            console.log('[createExpense] Returning invalid float error');
+            return res.status(403).json({ message: 'Invalid float or unauthorized', status: 0, data: null });
+        }
+        if (error?.message === 'FLOAT_MISSING') {
+            console.log('[createExpense] Returning float missing error');
+            return res.status(404).json({ message: 'Float not found', status: 0, data: null });
+        }
+        console.log('[createExpense] Returning generic error');
         return res.status(500).json({ message: 'Failed to create expense', status: 0, data: null });
     }
 };
@@ -864,6 +916,13 @@ export const listExpenses = async (req: Request, res: Response): Promise<Respons
     if (!user) return;
 
     const filters: { field: string; op: any; value: any }[] = [{ field: 'organisationId', op: '==', value: user.organisationId }];
+
+    // Allow filtering by floatId
+    const floatId = req.query.floatId as string;
+    if (floatId) {
+        filters.push({ field: 'floatId', op: '==', value: floatId });
+    }
+
     if (user.role === 'driver') {
         filters.push({ field: 'driverId', op: '==', value: user.uid });
     } else if (user.role === 'maintenance') {
@@ -931,7 +990,15 @@ export const getVehicles = async (req: Request, res: Response): Promise<Response
     // For now, allow all
 
     const data = await queryDocumentsByFilters('vehicles', filters);
-    res.status(200).json({ message: 'Vehicles fetched', status: 1, data });
+    
+    // Sort vehicles by sortOrder field (if present), vehicles without sortOrder go to the end
+    const sortedData = (data as any[]).sort((a, b) => {
+        const orderA = a.sortOrder ?? Number.MAX_SAFE_INTEGER;
+        const orderB = b.sortOrder ?? Number.MAX_SAFE_INTEGER;
+        return orderA - orderB;
+    });
+    
+    res.status(200).json({ message: 'Vehicles fetched', status: 1, data: sortedData });
 };
 
 export const getDrivers = async (req: Request, res: Response): Promise<Response | void> => {
