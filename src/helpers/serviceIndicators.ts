@@ -1,4 +1,6 @@
-import tourKmData from '../../tour-km-data.json';
+import * as tourKmDataImport from '../../tour-km-data.json';
+
+const tourKmData = tourKmDataImport as any;
 
 export interface ServiceIndicator {
   color: 'green' | 'amber' | 'red';
@@ -34,7 +36,7 @@ export function getTourKm(tourReference: string): number {
   if (!tourReference) return 0;
   
   // Try exact match first
-  const tourData = (tourKmData as any)[tourReference];
+  const tourData = tourKmData[tourReference];
   if (tourData?.km) return tourData.km;
   
   // Try case-insensitive match
@@ -53,7 +55,6 @@ export function getTourKm(tourReference: string): number {
   }
   
   // Default to 0 if no match found
-  console.warn(`No km data found for tour reference: ${tourReference}`);
   return 0;
 }
 
@@ -186,3 +187,6 @@ export function calculateBrakeIndicators(
 
   return indicators;
 }
+
+
+ 
