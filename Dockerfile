@@ -54,8 +54,15 @@ RUN if [ -f "./files/fonts/arial-Bold.ttf" ] && [ ! -f "./files/fonts/Arial-Bold
 # Copy fallback server
 COPY server-fallback.js ./
 
-# Build the application with fallback
-RUN npm run build || (echo "npm build failed, trying direct tsc..." && npx tsc) || (echo "Build failed, using fallback server..." && cp server-fallback.js build/server.js)
+# Build the application with detailed error output
+RUN echo "Starting build process..." && \
+    mkdir -p build && \
+    npm run build 2>&1 || \
+    (echo "npm build failed, trying direct tsc..." && npx tsc 2>&1) || \
+    (echo "Direct tsc failed, checking TypeScript configuration..." && \
+     npx tsc --noEmit --listFiles 2>&1 | head -20 && \
+     echo "Using fallback server..." && \
+     cp server-fallback.js build/server.js)
 
 # Verify build output
 RUN ls -la build/ || (echo "Build directory not found" && exit 1)
