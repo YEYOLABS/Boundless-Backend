@@ -48,7 +48,7 @@ RUN mkdir -p files/fonts files/tymebank files/capitec
 
 # Normalize font filename casing to match runtime expectations
 RUN if [ -f "./files/fonts/arial-Bold.ttf" ] && [ ! -f "./files/fonts/Arial-Bold.ttf" ]; then \
-      mv ./files/fonts/arial-Bold.ttf ./files/fonts/Arial-Bold.ttf; \
+    mv ./files/fonts/arial-Bold.ttf ./files/fonts/Arial-Bold.ttf; \
     fi
 
 # Copy fallback server
@@ -60,13 +60,13 @@ RUN echo "Starting build process..." && \
     npm run build 2>&1 || \
     (echo "npm build failed, trying direct tsc..." && npx tsc 2>&1) || \
     (echo "Direct tsc failed, checking TypeScript configuration..." && \
-     npx tsc --noEmit --listFiles 2>&1 | head -20 && \
-     echo "Using fallback server..." && \
-     cp server-fallback.js build/server.js)
+    npx tsc --noEmit --listFiles 2>&1 | head -20 && \
+    echo "Using fallback server..." && \
+    cp server-fallback.js build/server.js)
 
 # Verify build output (allow fallback server)
 RUN ls -la build/ || (echo "Build directory not found, creating..." && mkdir -p build)
-RUN test -f build/server.js || (echo "Warning: server.js not found in build directory, but continuing with fallback..." && ls -la build/)
+RUN test -f build/src/server.js || (echo "Warning: server.js not found in build/src directory, but continuing with fallback..." && ls -la build/)
 
 # Remove dev dependencies to reduce image size
 RUN npm prune --production
@@ -94,4 +94,4 @@ HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
     CMD node -e "require('http').get('http://localhost:8080/api/health', (res) => { process.exit(res.statusCode === 200 ? 0 : 1) })" || exit 1
 
 # Start the application
-CMD ["node", "build/server.js"]
+CMD ["node", "build/src/server.js"]
