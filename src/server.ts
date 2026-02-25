@@ -22,15 +22,13 @@ export let secrets = {
 };
 
 export const Main = () => {
-    // CORS must be first to handle preflight requests
-    app.use(corsHandler);
-    
     app.use(express.urlencoded({ extended: true }));
-    app.use(express.json({ limit: '10mb' }));
-    
     const filesPath = path.join(__dirname, '..', 'files');
     app.use('/api', express.static(filesPath));
-    
+
+    app.use(corsHandler);
+
+    app.use(express.json({ limit: '10mb' }));
     app.use('/api', routes);
 
     httpServer = http.createServer(app);
