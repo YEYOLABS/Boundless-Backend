@@ -162,12 +162,12 @@ export const createTour = async (req: Request, res: Response): Promise<Response 
             { field: 'role', op: '==', value: 'tour_manager' }
         ]);
         const managerEmails = tourManagers.filter((u: any) => u.email).map((u: any) => u.email);
-        
+
         // Build assignment details
         let assignmentDetails = '';
         let assignedVehicle = null;
         let assignedDriver = null;
-        
+
         if (vehicleId) {
             assignedVehicle = await getDocument('vehicles', vehicleId);
             assignmentDetails += `Vehicle: ${assignedVehicle?.licenceNumber || vehicleId}\n`;
@@ -194,7 +194,7 @@ export const createTour = async (req: Request, res: Response): Promise<Response 
                     subject: `New Tour Assignment: ${tour_reference}`,
                     text: `A new tour has been created with assignments:\n\nTour: ${tour_name} (${tour_reference})\nSupplier: ${supplier}\nStart Date: ${new Date(startDate).toLocaleDateString()}\nEnd Date: ${new Date(endDate).toLocaleDateString()}\nPAX: ${pax || 'N/A'}\n\nAssignments:\n${assignmentDetails}\n\nCreated by: ${user.username}`
                 };
-                
+
                 try {
                     await transporter.sendMail(managerMailOptions);
                     console.log('Email notification sent to tour managers:', managerEmails.join(', '));
@@ -211,7 +211,7 @@ export const createTour = async (req: Request, res: Response): Promise<Response 
                     subject: `New Tour Assignment: ${tour_reference}`,
                     text: `You have been assigned to a new tour:\n\nTour: ${tour_name} (${tour_reference})\nSupplier: ${supplier}\nStart Date: ${new Date(startDate).toLocaleDateString()}\nEnd Date: ${new Date(endDate).toLocaleDateString()}\nPAX: ${pax || 'N/A'}\n${vehicleId && assignedVehicle ? `\nVehicle: ${assignedVehicle.licenceNumber}` : ''}\n\nPlease review the tour details in the app.\n\nAssigned by: ${user.username}`
                 };
-                
+
                 try {
                     await transporter.sendMail(driverMailOptions);
                     console.log('Email notification sent to driver:', assignedDriver.email);
@@ -245,7 +245,8 @@ export const updateTour = async (req: Request, res: Response): Promise<Response 
         estimated_km,
         trailer_required,
         itinerary,
-        instructions
+        instructions,
+        isSubcontracted
     } = req.body;
 
     const tour = await getDocument('tours', tourId);
@@ -293,6 +294,7 @@ export const updateTour = async (req: Request, res: Response): Promise<Response 
     if (trailer_required !== undefined) updates.trailer_required = trailer_required;
     if (itinerary !== undefined) updates.itinerary = itinerary;
     if (instructions !== undefined) updates.instructions = instructions;
+    if (isSubcontracted !== undefined) updates.isSubcontracted = isSubcontracted;
 
     if (Object.keys(updates).length === 0) {
         return res.status(400).json({ message: 'No updates provided', status: 0, data: null });
@@ -302,9 +304,9 @@ export const updateTour = async (req: Request, res: Response): Promise<Response 
     await updateDocument('tours', tourId, updates);
 
     // Send email notifications if vehicle or driver assignment changed for future tour
-    const assignmentChanged = (vehicleId !== undefined && vehicleId !== oldVehicleId) || 
-                              (driverId !== undefined && driverId !== oldDriverId);
-    
+    const assignmentChanged = (vehicleId !== undefined && vehicleId !== oldVehicleId) ||
+        (driverId !== undefined && driverId !== oldDriverId);
+
     if (assignmentChanged && new Date(tour.startDate) > new Date()) {
         // Get tour managers to notify
         const tourManagers = await queryDocumentsByFilters('users', [
@@ -312,7 +314,7 @@ export const updateTour = async (req: Request, res: Response): Promise<Response 
             { field: 'role', op: '==', value: 'tour_manager' }
         ]);
         const managerEmails = tourManagers.filter((u: any) => u.email).map((u: any) => u.email);
-        
+
         if (process.env.EMAIL_USER && process.env.EMAIL_PASS) {
             const transporter = nodemailer.createTransport({
                 service: 'gmail',
@@ -328,7 +330,7 @@ export const updateTour = async (req: Request, res: Response): Promise<Response 
             let newVehicle = null;
             let oldDriver = null;
             let newDriver = null;
-            
+
             if (vehicleId !== undefined && vehicleId !== oldVehicleId) {
                 oldVehicle = oldVehicleId ? await getDocument('vehicles', oldVehicleId) : null;
                 newVehicle = vehicleId ? await getDocument('vehicles', vehicleId) : null;
@@ -348,7 +350,7 @@ export const updateTour = async (req: Request, res: Response): Promise<Response 
                     subject: `Tour Assignment Update: ${tour.tour_reference}`,
                     text: `A tour assignment has been updated:\n\nTour: ${tour.tour_name} (${tour.tour_reference})\nSupplier: ${tour.supplier}\nStart Date: ${new Date(tour.startDate).toLocaleDateString()}\n\nChanges:\n${changeDetails}\n\nUpdated by: ${user.username}`
                 };
-                
+
                 try {
                     await transporter.sendMail(managerMailOptions);
                     console.log('Email notification sent to tour managers:', managerEmails.join(', '));
@@ -365,7 +367,7 @@ export const updateTour = async (req: Request, res: Response): Promise<Response 
                     subject: `Tour Assignment: ${tour.tour_reference}`,
                     text: `You have been assigned to a tour:\n\nTour: ${tour.tour_name} (${tour.tour_reference})\nSupplier: ${tour.supplier}\nStart Date: ${new Date(tour.startDate).toLocaleDateString()}\nEnd Date: ${new Date(tour.endDate).toLocaleDateString()}\n${vehicleId && newVehicle ? `\nVehicle: ${newVehicle.licenceNumber}` : ''}\n\nPlease review the tour details in the app.\n\nAssigned by: ${user.username}`
                 };
-                
+
                 try {
                     await transporter.sendMail(driverMailOptions);
                     console.log('Email notification sent to driver:', newDriver.email);
@@ -382,7 +384,7 @@ export const updateTour = async (req: Request, res: Response): Promise<Response 
                     subject: `Tour Assignment Changed: ${tour.tour_reference}`,
                     text: `You have been unassigned from a tour:\n\nTour: ${tour.tour_name} (${tour.tour_reference})\nSupplier: ${tour.supplier}\nStart Date: ${new Date(tour.startDate).toLocaleDateString()}\n\nThe tour has been reassigned to another driver.\n\nUpdated by: ${user.username}`
                 };
-                
+
                 try {
                     await transporter.sendMail(oldDriverMailOptions);
                     console.log('Email notification sent to previous driver:', oldDriver.email);
@@ -421,7 +423,7 @@ export const listTours = async (req: Request, res: Response): Promise<Response |
     }
 
     const tours = await queryDocumentsByFilters('tours', filters);
-    
+
     // Calculate maintenance indicators for tours with vehicles
     const toursWithIndicators = await Promise.all(
         tours.map(async (tour: any) => {
@@ -446,14 +448,15 @@ export const listTours = async (req: Request, res: Response): Promise<Response |
                 tyres: vehicle.vehicleMaintenanceIntervalsKm?.tyres || 70000,
                 alignmentBalancing: vehicle.vehicleMaintenanceIntervalsKm?.alignmentBalancing || 8000,
                 service: vehicle.vehicleMaintenanceIntervalsKm?.service || 15000,
-                brakes: 50000 // Default brake interval
+                brakes: vehicle.vehicleMaintenanceIntervalsKm?.brakePadsFront || 50000
             };
-            
+
+            const m = (vehicle as any)?.maintenanceData || {};
             const lastServiceOdos = {
-                tyres: vehicle.lastTyresOdo || vehicle.odometer || 0,
-                wheels: vehicle.lastWheelsOdo || vehicle.odometer || 0,
-                service: vehicle.lastServiceOdo || vehicle.odometer || 0,
-                brakes: vehicle.lastBrakeOdo || vehicle.odometer || 0
+                tyres: m.tyres?.leftFront?.lastLog || vehicle.lastTyresOdo || vehicle.odometer || 0,
+                wheels: m.wheelAlignment?.lastLog || vehicle.lastWheelsOdo || vehicle.odometer || 0,
+                service: m.service?.lastLog || vehicle.lastServiceOdo || vehicle.odometer || 0,
+                brakes: m.brakePads?.front?.lastLog || vehicle.lastBrakeOdo || vehicle.odometer || 0
             };
 
             // Calculate all maintenance indicators
@@ -475,7 +478,7 @@ export const listTours = async (req: Request, res: Response): Promise<Response |
             };
         })
     );
-    
+
     res.status(200).json({ message: 'Tours fetched', status: 1, data: toursWithIndicators });
 };
 
@@ -495,6 +498,30 @@ export const getTourById = async (req: Request, res: Response): Promise<Response
         return res.status(403).json({ message: 'Drivers can only view their own tours', status: 0, data: null });
     }
     res.status(200).json({ message: 'Tour fetched', status: 1, data: { ...tour, id: tourId } });
+};
+
+export const getTourByReference = async (req: Request, res: Response): Promise<Response | void> => {
+    const user = ensureUser(req, res);
+    if (!user) return;
+    const tourReference = req.params.reference;
+
+    // Query tours by tour_reference field
+    const tours = await queryDocumentsByFilters('tours', [
+        { field: 'organisationId', op: '==', value: user.organisationId },
+        { field: 'tour_reference', op: '==', value: tourReference }
+    ]);
+
+    if (!tours || tours.length === 0) {
+        return res.status(404).json({ message: 'Tour not found', status: 0, data: null });
+    }
+
+    const tour = tours[0];
+    
+    if (user.role === 'driver' && tour.driverId !== user.uid) {
+        return res.status(403).json({ message: 'Drivers can only view their own tours', status: 0, data: null });
+    }
+
+    res.status(200).json({ message: 'Tour fetched', status: 1, data: tour });
 };
 
 export const deleteTour = async (req: Request, res: Response): Promise<Response | void> => {
@@ -638,14 +665,43 @@ export const submitInspection = async (req: Request, res: Response): Promise<Res
         updatedAt: now
     });
 
-    // Update vehicle with latest odometer reading
+    // Update vehicle with latest odometer reading and maintenance status
     if (vehicleId) {
         const odometerResult = results.find(r => r.key === 'odometer_reading');
-        if (odometerResult && typeof odometerResult.value === 'string') {
-            const odometerValue = parseFloat(odometerResult.value);
-            if (!isNaN(odometerValue)) {
+        let odometerValue = (vehicle as any)?.latest_odometer || 0;
+
+        if (odometerResult) {
+            const val = typeof odometerResult.value === 'string' ? parseFloat(odometerResult.value) : odometerResult.value;
+            if (typeof val === 'number' && !isNaN(val)) {
+                odometerValue = val;
                 await updateDocument('vehicles', vehicleId, { latest_odometer: odometerValue, updatedAt: now });
             }
+        }
+
+        // Check for maintenance events (Service, Tyres, Brakes)
+        const serviceDone = results.find(r => r.key === 'service_done')?.value === true;
+        const tyresDone = results.find(r => r.key === 'tyre_change_done')?.value === true;
+        const brakesDone = results.find(r => r.key === 'brake_pad_change_done')?.value === true;
+
+        if (serviceDone || tyresDone || brakesDone) {
+            const maintenanceData = (vehicle as any)?.maintenanceData || {};
+
+            if (serviceDone && maintenanceData.service) {
+                maintenanceData.service.lastLog = odometerValue;
+            }
+            if (tyresDone && maintenanceData.tyres) {
+                Object.keys(maintenanceData.tyres).forEach(k => {
+                    if (maintenanceData.tyres[k]) {
+                        maintenanceData.tyres[k].lastLog = odometerValue;
+                    }
+                });
+            }
+            if (brakesDone && maintenanceData.brakePads) {
+                if (maintenanceData.brakePads.front) maintenanceData.brakePads.front.lastLog = odometerValue;
+                if (maintenanceData.brakePads.rear) maintenanceData.brakePads.rear.lastLog = odometerValue;
+            }
+
+            await updateDocument('vehicles', vehicleId, { maintenanceData, updatedAt: now });
         }
     }
 
@@ -788,7 +844,7 @@ export const listIssues = async (req: Request, res: Response): Promise<Response 
     }
 
     const issues = await queryDocumentsByFilters('issues', filters);
-    
+
     // Enrich issues with vehicle names
     const enrichedIssues = await Promise.all(
         issues.map(async (issue: any) => {
@@ -802,7 +858,7 @@ export const listIssues = async (req: Request, res: Response): Promise<Response 
             return { ...issue, vehicleName: 'Unknown Vehicle' };
         })
     );
-    
+
     res.status(200).json({ message: 'Issues fetched', status: 1, data: enrichedIssues });
 };
 
@@ -913,7 +969,7 @@ export const createExpense = async (req: Request, res: Response): Promise<Respon
     if (!requireRole(res, user.role, ['driver'])) return;
 
     const { category, amountCents, receiptUrl, tourId, floatId, description } = req.body;
-    
+
     console.log('[createExpense] Request received:', {
         category,
         amountCents,
@@ -923,7 +979,7 @@ export const createExpense = async (req: Request, res: Response): Promise<Respon
         hasReceiptUrl: !!receiptUrl,
         user: user.uid
     });
-    
+
     // Upload receipt image if provided
     let receiptDownloadUrl: string | null = null;
     if (receiptUrl) {
@@ -980,7 +1036,7 @@ export const createExpense = async (req: Request, res: Response): Promise<Respon
                 remainingAmount: floatData.remainingAmount,
                 amountCents: amountCents
             });
-            
+
             if (floatData.organisationId !== user.organisationId || floatData.driverId !== user.uid) {
                 console.log('[createExpense] FLOAT_INVALID - org or driver mismatch');
                 console.log('  Expected org:', user.organisationId, 'Got:', floatData.organisationId);
@@ -1192,14 +1248,14 @@ export const getVehicles = async (req: Request, res: Response): Promise<Response
     // For now, allow all
 
     const data = await queryDocumentsByFilters('vehicles', filters);
-    
+
     // Sort vehicles by sortOrder field (if present), vehicles without sortOrder go to the end
     const sortedData = (data as any[]).sort((a, b) => {
         const orderA = a.sortOrder ?? Number.MAX_SAFE_INTEGER;
         const orderB = b.sortOrder ?? Number.MAX_SAFE_INTEGER;
         return orderA - orderB;
     });
-    
+
     res.status(200).json({ message: 'Vehicles fetched', status: 1, data: sortedData });
 };
 
@@ -1213,13 +1269,13 @@ export const getDrivers = async (req: Request, res: Response): Promise<Response 
     ];
 
     const drivers = await queryDocumentsByFilters('users', filters);
-    
+
     // Get all vehicles to match drivers with their vehicle's sortOrder
     const vehicleFilters: { field: string; op: any; value: any }[] = [
         { field: 'organisationId', op: '==', value: user.organisationId }
     ];
     const vehicles = await queryDocumentsByFilters('vehicles', vehicleFilters);
-    
+
     // Create a map of driverId to vehicle sortOrder
     const driverSortOrderMap = new Map<string, number>();
     (vehicles as any[]).forEach((vehicle: any) => {
@@ -1227,14 +1283,14 @@ export const getDrivers = async (req: Request, res: Response): Promise<Response 
             driverSortOrderMap.set(vehicle.currentDriverId, vehicle.sortOrder);
         }
     });
-    
+
     // Sort drivers by their vehicle's sortOrder (drivers without vehicles go to the end)
     const sortedDrivers = (drivers as any[]).sort((a, b) => {
         const orderA = driverSortOrderMap.get(a.uid) ?? Number.MAX_SAFE_INTEGER;
         const orderB = driverSortOrderMap.get(b.uid) ?? Number.MAX_SAFE_INTEGER;
         return orderA - orderB;
     });
-    
+
     res.status(200).json({ message: 'Drivers fetched', status: 1, data: sortedDrivers });
 };
 
@@ -1309,14 +1365,14 @@ export const getIssuesForVehicle = async (req: Request, res: Response): Promise<
     }
 
     const issues = await queryDocumentsByFilters('issues', [{ field: 'vehicleId', op: '==', value: vehicleId }]);
-    
+
     // Enrich issues with vehicle name
     const vehicleName = `${vehicle.model} (${vehicle.licenceNumber})`;
     const enrichedIssues = issues.map((issue: any) => ({
         ...issue,
         vehicleName
     }));
-    
+
     res.status(200).json({ message: 'Success', status: 1, data: enrichedIssues });
 };
 

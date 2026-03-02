@@ -8,6 +8,7 @@ import {
     deleteTour,
     listTours,
     getTourById,
+    getTourByReference,
     submitInspection,
     listInspectionsForTour,
     createIssue,
@@ -62,6 +63,7 @@ router.post('/tours', authorize, createTour);
 router.patch('/tours/:id', authorize, updateTour);
 router.delete('/tours/:id', authorize, deleteTour);
 router.get('/tours', authorize, listTours);
+router.get('/tours/reference/:reference', authorize, getTourByReference);
 router.get('/tours/:id', authorize, getTourById);
 router.post('/get-assigned-task', authorize, getTaskAssigned);
 // Inspections
