@@ -246,7 +246,9 @@ export const updateTour = async (req: Request, res: Response): Promise<Response 
         trailer_required,
         itinerary,
         instructions,
-        isSubcontracted
+        isSubcontracted,
+        subcontractorId,
+        subcontractorName
     } = req.body;
 
     const tour = await getDocument('tours', tourId);
@@ -295,6 +297,8 @@ export const updateTour = async (req: Request, res: Response): Promise<Response 
     if (itinerary !== undefined) updates.itinerary = itinerary;
     if (instructions !== undefined) updates.instructions = instructions;
     if (isSubcontracted !== undefined) updates.isSubcontracted = isSubcontracted;
+    if (subcontractorId !== undefined) updates.subcontractorId = subcontractorId;
+    if (subcontractorName !== undefined) updates.subcontractorName = subcontractorName;
 
     if (Object.keys(updates).length === 0) {
         return res.status(400).json({ message: 'No updates provided', status: 0, data: null });
