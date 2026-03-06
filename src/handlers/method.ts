@@ -1614,3 +1614,144 @@ export const deleteUser = async (req: Request, res: Response): Promise<Response 
     await deleteDocument('users', userId);
     res.status(200).json({ message: 'User deleted', status: 1 });
 };
+
+// Tour Codes
+export const getTourCodes = async (req: Request, res: Response): Promise<Response | void> => {
+    const user = ensureUser(req, res);
+    if (!user) return;
+
+    try {
+        const tourCodes = await queryDocumentsByFilters('tourCodes', [
+            { field: 'organisationId', op: '==', value: user.organisationId }
+        ]);
+        res.status(200).json({ message: 'Tour codes retrieved', status: 1, data: tourCodes });
+    } catch (error) {
+        console.error('Error fetching tour codes:', error);
+        res.status(500).json({ message: 'Failed to fetch tour codes', status: 0, data: null });
+    }
+};
+
+export const createTourCode = async (req: Request, res: Response): Promise<Response | void> => {
+    const user = ensureUser(req, res);
+    if (!user) return;
+    if (!requireRole(res, user.role, ['owner'])) return;
+
+    const { code, routeName, kilometers } = req.body;
+
+    if (!code || !routeName || kilometers === undefined) {
+        return res.status(400).json({ 
+            message: 'Missing required fields: code, routeName, kilometers', 
+            status: 0, 
+            data: null 
+        });
+    }
+
+    try {
+        // Check if tour code already exists
+        const existing = await queryDocumentsByFilters('tourCodes', [
+            { field: 'organisationId', op: '==', value: user.organisationId },
+            { field: 'code', op: '==', value: code.toUpperCase() }
+        ]);
+
+        if (existing.length > 0) {
+            return res.status(400).json({ 
+                message: 'Tour code already exists', 
+                status: 0, 
+                data: null 
+            });
+        }
+
+        const tourCodeRef = createDocRef('tourCodes');
+        const tourCodeData = {
+            id: tourCodeRef.id,
+            code: code.toUpperCase(),
+            routeName,
+            kilometers: Number(kilometers),
+            organisationId: user.organisationId,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
+        };
+
+        await setDocument('tourCodes', tourCodeRef.id, tourCodeData);
+        res.status(201).json({ 
+            message: 'Tour code created', 
+            status: 1, 
+            data: tourCodeData 
+        });
+    } catch (error) {
+        console.error('Error creating tour code:', error);
+        res.status(500).json({ message: 'Failed to create tour code', status: 0, data: null });
+    }
+};
+
+export const updateTourCode = async (req: Request, res: Response): Promise<Response | void> => {
+    const user = ensureUser(req, res);
+    if (!user) return;
+    if (!requireRole(res, user.role, ['owner'])) return;
+
+    const tourCodeId = req.params.id;
+    const { routeName, kilometers } = req.body;
+
+    try {
+        const tourCode = await getDocument('tourCodes', tourCodeId);
+        if (!tourCode) {
+            return res.status(404).json({ message: 'Tour code not found', status: 0, data: null });
+        }
+
+        if (tourCode.organisationId !== user.organisationId) {
+            return res.status(403).json({ 
+                message: 'Tour code does not belong to organisation', 
+                status: 0, 
+                data: null 
+            });
+        }
+
+        const updates: any = {
+            updatedAt: new Date().toISOString()
+        };
+
+        if (routeName !== undefined) updates.routeName = routeName;
+        if (kilometers !== undefined) updates.kilometers = Number(kilometers);
+
+        await updateDocument('tourCodes', tourCodeId, updates);
+        
+        const updatedTourCode = { ...tourCode, ...updates };
+        res.status(200).json({ 
+            message: 'Tour code updated', 
+            status: 1, 
+            data: updatedTourCode 
+        });
+    } catch (error) {
+        console.error('Error updating tour code:', error);
+        res.status(500).json({ message: 'Failed to update tour code', status: 0, data: null });
+    }
+};
+
+export const deleteTourCode = async (req: Request, res: Response): Promise<Response | void> => {
+    const user = ensureUser(req, res);
+    if (!user) return;
+    if (!requireRole(res, user.role, ['owner'])) return;
+
+    const tourCodeId = req.params.id;
+
+    try {
+        const tourCode = await getDocument('tourCodes', tourCodeId);
+        if (!tourCode) {
+            return res.status(404).json({ message: 'Tour code not found', status: 0, data: null });
+        }
+
+        if (tourCode.organisationId !== user.organisationId) {
+            return res.status(403).json({ 
+                message: 'Tour code does not belong to organisation', 
+                status: 0, 
+                data: null 
+            });
+        }
+
+        await deleteDocument('tourCodes', tourCodeId);
+        res.status(200).json({ message: 'Tour code deleted', status: 1 });
+    } catch (error) {
+        console.error('Error deleting tour code:', error);
+        res.status(500).json({ message: 'Failed to delete tour code', status: 0, data: null });
+    }
+};
