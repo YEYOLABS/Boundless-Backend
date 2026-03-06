@@ -19,6 +19,7 @@ import path from 'path';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { storage } from '../config/firebase';
 import { calculateMaintenanceIndicators } from '../helpers/serviceIndicators';
+import { autoPopulateEstimatedKm } from '../helpers/tourCodeMatcher';
 
 type Role = 'driver' | 'ops' | 'owner' | 'tour_manager';
 
@@ -118,6 +119,9 @@ export const createTour = async (req: Request, res: Response): Promise<Response 
     const tourRef = createDocRef('tours');
     const now = new Date().toISOString();
 
+    // Auto-populate estimated_km from tour code if not provided
+    const finalEstimatedKm = autoPopulateEstimatedKm(tour_reference || '', tour_name || '', estimated_km);
+
     await setDocument('tours', tourRef.id, {
         organisationId: user.organisationId,
         driverId: driverId || null,
@@ -134,7 +138,7 @@ export const createTour = async (req: Request, res: Response): Promise<Response 
         tour_name: tour_name || '',
         supplier: supplier || '',
         pax: pax || null,
-        estimated_km: estimated_km || 0,
+        estimated_km: finalEstimatedKm,
         trailer_required: trailer_required || false,
         itinerary: itinerary || '',
         instructions: instructions || ''
@@ -292,7 +296,14 @@ export const updateTour = async (req: Request, res: Response): Promise<Response 
     if (tour_name !== undefined) updates.tour_name = tour_name;
     if (supplier !== undefined) updates.supplier = supplier;
     if (pax !== undefined) updates.pax = pax;
-    if (estimated_km !== undefined) updates.estimated_km = estimated_km;
+    if (estimated_km !== undefined) {
+        updates.estimated_km = estimated_km;
+    } else if (tour_reference !== undefined || tour_name !== undefined) {
+        // Auto-populate estimated_km if tour_reference or tour_name changed
+        const finalTourRef = tour_reference !== undefined ? tour_reference : tour.tour_reference;
+        const finalTourName = tour_name !== undefined ? tour_name : tour.tour_name;
+        updates.estimated_km = autoPopulateEstimatedKm(finalTourRef, finalTourName, tour.estimated_km);
+    }
     if (trailer_required !== undefined) updates.trailer_required = trailer_required;
     if (itinerary !== undefined) updates.itinerary = itinerary;
     if (instructions !== undefined) updates.instructions = instructions;
@@ -463,12 +474,19 @@ export const listTours = async (req: Request, res: Response): Promise<Response |
                 brakes: m.brakePads?.front?.lastLog || vehicle.lastBrakeOdo || vehicle.odometer || 0
             };
 
+            // Get thresholds from vehicle or use defaults
+            const thresholds = vehicle.maintenanceThresholds || {
+                amberThreshold: 5000,
+                redThreshold: 1000
+            };
+
             // Calculate all maintenance indicators
             const maintenanceIndicators = calculateMaintenanceIndicators(
                 vehicleTours as any[],
                 currentOdometer,
                 intervals,
-                lastServiceOdos
+                lastServiceOdos,
+                thresholds
             );
 
             return {
@@ -1753,5 +1771,67 @@ export const deleteTourCode = async (req: Request, res: Response): Promise<Respo
     } catch (error) {
         console.error('Error deleting tour code:', error);
         res.status(500).json({ message: 'Failed to delete tour code', status: 0, data: null });
+    }
+};
+
+
+export const seedTourCodes = async (req: Request, res: Response): Promise<Response | void> => {
+    const user = ensureUser(req, res);
+    if (!user) return;
+    if (!requireRole(res, user.role, ['owner'])) return;
+
+    const tourCodesData = [
+        { code: 'ZAPAN', routeName: 'Panorama', kilometers: 5900 },
+        { code: 'ZAKRU', routeName: 'Kruger', kilometers: 3300 },
+        { code: 'ZAAD', routeName: 'Addo North', kilometers: 2600 },
+        { code: 'ZAADS', routeName: 'Addo South', kilometers: 3000 },
+        { code: 'ZAOUT', routeName: 'Outeniqua', kilometers: 2500 },
+        { code: 'ZARAI', routeName: 'Rainbow North', kilometers: 3000 },
+        { code: 'ZARAIS', routeName: 'Rainbow South', kilometers: 3000 }
+    ];
+
+    try {
+        const seededCodes = [];
+        
+        for (const tourCode of tourCodesData) {
+            // Check if tour code already exists
+            const existing = await queryDocumentsByFilters('tourCodes', [
+                { field: 'organisationId', op: '==', value: user.organisationId },
+                { field: 'code', op: '==', value: tourCode.code }
+            ]);
+
+            if (existing.length === 0) {
+                const tourCodeRef = createDocRef('tourCodes');
+                const tourCodeData = {
+                    id: tourCodeRef.id,
+                    code: tourCode.code,
+                    routeName: tourCode.routeName,
+                    kilometers: tourCode.kilometers,
+                    organisationId: user.organisationId,
+                    createdAt: new Date().toISOString(),
+                    updatedAt: new Date().toISOString()
+                };
+
+                await setDocument('tourCodes', tourCodeRef.id, tourCodeData);
+                seededCodes.push(tourCode.code);
+            }
+        }
+
+        if (seededCodes.length === 0) {
+            return res.status(200).json({ 
+                message: 'All tour codes already exist', 
+                status: 1, 
+                data: { seeded: [] } 
+            });
+        }
+
+        res.status(201).json({ 
+            message: `Successfully seeded ${seededCodes.length} tour codes`, 
+            status: 1, 
+            data: { seeded: seededCodes } 
+        });
+    } catch (error) {
+        console.error('Error seeding tour codes:', error);
+        res.status(500).json({ message: 'Failed to seed tour codes', status: 0, data: null });
     }
 };

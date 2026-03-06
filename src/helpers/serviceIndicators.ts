@@ -14,12 +14,18 @@ export interface MaintenanceIndicators {
 /**
  * Calculate indicator color based on remaining km
  * @param remainingKm - Kilometers remaining until service
+ * @param amberThreshold - Threshold for amber warning (default 5000)
+ * @param redThreshold - Threshold for red critical (default 1000)
  * @returns Color code: 'green', 'amber', or 'red'
  */
-export function getIndicatorColor(remainingKm: number): 'green' | 'amber' | 'red' {
+export function getIndicatorColor(
+  remainingKm: number, 
+  amberThreshold: number = 5000, 
+  redThreshold: number = 1000
+): 'green' | 'amber' | 'red' {
   if (remainingKm < 0) return 'red';
-  if (remainingKm < 1000) return 'red';
-  if (remainingKm < 5000) return 'amber';
+  if (remainingKm < redThreshold) return 'red';
+  if (remainingKm < amberThreshold) return 'amber';
   return 'green';
 }
 
@@ -29,6 +35,7 @@ export function getIndicatorColor(remainingKm: number): 'green' | 'amber' | 'red
  * @param currentOdometer - Current vehicle odometer reading
  * @param intervals - Maintenance intervals for the vehicle
  * @param lastServiceOdos - Last service odometer readings
+ * @param thresholds - Optional thresholds for color coding
  * @returns Record of maintenance indicators for each tour
  */
 export function calculateMaintenanceIndicators(
@@ -45,8 +52,15 @@ export function calculateMaintenanceIndicators(
     wheels: number;
     service: number;
     brakes: number;
+  },
+  thresholds?: {
+    amberThreshold: number;
+    redThreshold: number;
   }
 ): Record<string, MaintenanceIndicators> {
+  const amberThreshold = thresholds?.amberThreshold || 5000;
+  const redThreshold = thresholds?.redThreshold || 1000;
+  
   const indicators: Record<string, MaintenanceIndicators> = {};
   let cumulativeKm = currentOdometer;
 
@@ -68,22 +82,22 @@ export function calculateMaintenanceIndicators(
 
     indicators[tour.id] = {
       tyres: {
-        color: getIndicatorColor(tyresRemaining),
+        color: getIndicatorColor(tyresRemaining, amberThreshold, redThreshold),
         remainingKm: tyresRemaining,
         cumulativeKm
       },
       wheels: {
-        color: getIndicatorColor(wheelsRemaining),
+        color: getIndicatorColor(wheelsRemaining, amberThreshold, redThreshold),
         remainingKm: wheelsRemaining,
         cumulativeKm
       },
       service: {
-        color: getIndicatorColor(serviceRemaining),
+        color: getIndicatorColor(serviceRemaining, amberThreshold, redThreshold),
         remainingKm: serviceRemaining,
         cumulativeKm
       },
       brakes: {
-        color: getIndicatorColor(brakesRemaining),
+        color: getIndicatorColor(brakesRemaining, amberThreshold, redThreshold),
         remainingKm: brakesRemaining,
         cumulativeKm
       }

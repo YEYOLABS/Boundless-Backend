@@ -41,7 +41,8 @@ import {
     getTourCodes,
     createTourCode,
     updateTourCode,
-    deleteTourCode
+    deleteTourCode,
+    seedTourCodes
 } from '../handlers/method';
 import { authenticate, register } from '../handlers/auth/auth';
 import { authorize } from '../handlers/auth/middleware/authentication';
@@ -117,6 +118,7 @@ router.delete('/users/:id', authorize, deleteUser);
 // Tour Codes
 router.get('/tour-codes', authorize, getTourCodes);
 router.post('/tour-codes', authorize, createTourCode);
+router.post('/tour-codes/seed', authorize, seedTourCodes);
 router.put('/tour-codes/:id', authorize, updateTourCode);
 router.delete('/tour-codes/:id', authorize, deleteTourCode);
 
