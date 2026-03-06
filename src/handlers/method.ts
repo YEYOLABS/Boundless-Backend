@@ -1784,10 +1784,10 @@ export const seedTourCodes = async (req: Request, res: Response): Promise<Respon
         { code: 'ZAPAN', routeName: 'Panorama', kilometers: 5900 },
         { code: 'ZAKRU', routeName: 'Kruger', kilometers: 3300 },
         { code: 'ZAAD', routeName: 'Addo North', kilometers: 2600 },
-        { code: 'ZAADS', routeName: 'Addo South', kilometers: 3000 },
+        { code: 'ZAAD', routeName: 'Addo South', kilometers: 3000 },
         { code: 'ZAOUT', routeName: 'Outeniqua', kilometers: 2500 },
         { code: 'ZARAI', routeName: 'Rainbow North', kilometers: 3000 },
-        { code: 'ZARAIS', routeName: 'Rainbow South', kilometers: 3000 }
+        { code: 'ZARAI', routeName: 'Rainbow South', kilometers: 3000 }
     ];
 
     try {
