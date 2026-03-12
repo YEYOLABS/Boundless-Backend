@@ -29,7 +29,7 @@ type InspectionResult = {
     imageUrl?: string;
 };
 
-const allowedTourStatuses = ['planned', 'active', 'completed', 'cancelled', 'confirmed'];
+const allowedTourStatuses = ['planned', 'active', 'completed', 'cancelled', 'confirmed', 'deleted'];
 
 export const ensureUser = (req: Request, res: Response) => {
     const user = (req as IGetUserAuthInfoRequest).user;
@@ -538,7 +538,7 @@ export const getTourByReference = async (req: Request, res: Response): Promise<R
     }
 
     const tour = tours[0];
-    
+
     if (user.role === 'driver' && tour.driverId !== user.uid) {
         return res.status(403).json({ message: 'Drivers can only view their own tours', status: 0, data: null });
     }
@@ -583,7 +583,12 @@ export const deleteTour = async (req: Request, res: Response): Promise<Response 
         }
     }
 
-    await deleteDocument('tours', tourId);
+    // Soft delete: update status instead of deleting document
+    await updateDocument('tours', tourId, {
+        status: 'deleted',
+        deletedAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+    });
     res.status(200).json({ message: 'Tour deleted', status: 1 });
 };
 
@@ -1657,10 +1662,10 @@ export const createTourCode = async (req: Request, res: Response): Promise<Respo
     const { code, routeName, kilometers } = req.body;
 
     if (!code || !routeName || kilometers === undefined) {
-        return res.status(400).json({ 
-            message: 'Missing required fields: code, routeName, kilometers', 
-            status: 0, 
-            data: null 
+        return res.status(400).json({
+            message: 'Missing required fields: code, routeName, kilometers',
+            status: 0,
+            data: null
         });
     }
 
@@ -1672,10 +1677,10 @@ export const createTourCode = async (req: Request, res: Response): Promise<Respo
         ]);
 
         if (existing.length > 0) {
-            return res.status(400).json({ 
-                message: 'Tour code already exists', 
-                status: 0, 
-                data: null 
+            return res.status(400).json({
+                message: 'Tour code already exists',
+                status: 0,
+                data: null
             });
         }
 
@@ -1691,10 +1696,10 @@ export const createTourCode = async (req: Request, res: Response): Promise<Respo
         };
 
         await setDocument('tourCodes', tourCodeRef.id, tourCodeData);
-        res.status(201).json({ 
-            message: 'Tour code created', 
-            status: 1, 
-            data: tourCodeData 
+        res.status(201).json({
+            message: 'Tour code created',
+            status: 1,
+            data: tourCodeData
         });
     } catch (error) {
         console.error('Error creating tour code:', error);
@@ -1717,10 +1722,10 @@ export const updateTourCode = async (req: Request, res: Response): Promise<Respo
         }
 
         if (tourCode.organisationId !== user.organisationId) {
-            return res.status(403).json({ 
-                message: 'Tour code does not belong to organisation', 
-                status: 0, 
-                data: null 
+            return res.status(403).json({
+                message: 'Tour code does not belong to organisation',
+                status: 0,
+                data: null
             });
         }
 
@@ -1732,12 +1737,12 @@ export const updateTourCode = async (req: Request, res: Response): Promise<Respo
         if (kilometers !== undefined) updates.kilometers = Number(kilometers);
 
         await updateDocument('tourCodes', tourCodeId, updates);
-        
+
         const updatedTourCode = { ...tourCode, ...updates };
-        res.status(200).json({ 
-            message: 'Tour code updated', 
-            status: 1, 
-            data: updatedTourCode 
+        res.status(200).json({
+            message: 'Tour code updated',
+            status: 1,
+            data: updatedTourCode
         });
     } catch (error) {
         console.error('Error updating tour code:', error);
@@ -1759,10 +1764,10 @@ export const deleteTourCode = async (req: Request, res: Response): Promise<Respo
         }
 
         if (tourCode.organisationId !== user.organisationId) {
-            return res.status(403).json({ 
-                message: 'Tour code does not belong to organisation', 
-                status: 0, 
-                data: null 
+            return res.status(403).json({
+                message: 'Tour code does not belong to organisation',
+                status: 0,
+                data: null
             });
         }
 
@@ -1792,7 +1797,7 @@ export const seedTourCodes = async (req: Request, res: Response): Promise<Respon
 
     try {
         const seededCodes = [];
-        
+
         for (const tourCode of tourCodesData) {
             // Check if tour code already exists
             const existing = await queryDocumentsByFilters('tourCodes', [
@@ -1818,17 +1823,17 @@ export const seedTourCodes = async (req: Request, res: Response): Promise<Respon
         }
 
         if (seededCodes.length === 0) {
-            return res.status(200).json({ 
-                message: 'All tour codes already exist', 
-                status: 1, 
-                data: { seeded: [] } 
+            return res.status(200).json({
+                message: 'All tour codes already exist',
+                status: 1,
+                data: { seeded: [] }
             });
         }
 
-        res.status(201).json({ 
-            message: `Successfully seeded ${seededCodes.length} tour codes`, 
-            status: 1, 
-            data: { seeded: seededCodes } 
+        res.status(201).json({
+            message: `Successfully seeded ${seededCodes.length} tour codes`,
+            status: 1,
+            data: { seeded: seededCodes }
         });
     } catch (error) {
         console.error('Error seeding tour codes:', error);
