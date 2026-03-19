@@ -79,6 +79,9 @@ export const createTour = async (req: Request, res: Response): Promise<Response 
     const {
         driverId,
         vehicleId,
+        vehicleName,
+        trailerId,
+        trailerName,
         startDate,
         endDate,
         status,
@@ -90,7 +93,8 @@ export const createTour = async (req: Request, res: Response): Promise<Response 
         estimated_km,
         trailer_required,
         itinerary,
-        instructions
+        instructions,
+        addons
     } = req.body;
 
     if (!startDate || !endDate) {
@@ -126,6 +130,9 @@ export const createTour = async (req: Request, res: Response): Promise<Response 
         organisationId: user.organisationId,
         driverId: driverId || null,
         vehicleId: vehicleId || null,
+        vehicleName: vehicleName || null,
+        trailerId: trailerId || null,
+        trailerName: trailerName || null,
         startDate,
         endDate,
         status: tourStatus,
@@ -141,7 +148,8 @@ export const createTour = async (req: Request, res: Response): Promise<Response 
         estimated_km: finalEstimatedKm,
         trailer_required: trailer_required || false,
         itinerary: itinerary || '',
-        instructions: instructions || ''
+        instructions: instructions || '',
+        addons: addons || []
     });
 
     // Update vehicle with assignment details only if vehicleId is provided
@@ -237,7 +245,11 @@ export const updateTour = async (req: Request, res: Response): Promise<Response 
     const tourId = req.params.id;
     const {
         driverId,
+        driverName,
         vehicleId,
+        vehicleName,
+        trailerId,
+        trailerName,
         startDate,
         endDate,
         status,
@@ -250,6 +262,7 @@ export const updateTour = async (req: Request, res: Response): Promise<Response 
         trailer_required,
         itinerary,
         instructions,
+        addons,
         isSubcontracted,
         subcontractorId,
         subcontractorName
@@ -268,6 +281,10 @@ export const updateTour = async (req: Request, res: Response): Promise<Response 
 
     const updates: Record<string, any> = {};
     if (driverId !== undefined) updates.driverId = driverId;
+    if (driverName !== undefined) updates.driverName = driverName;
+    if (vehicleName !== undefined) updates.vehicleName = vehicleName;
+    if (trailerId !== undefined) updates.trailerId = trailerId;
+    if (trailerName !== undefined) updates.trailerName = trailerName;
     if (startDate) updates.startDate = startDate;
     if (endDate) updates.endDate = endDate;
     if (status) {
@@ -307,6 +324,7 @@ export const updateTour = async (req: Request, res: Response): Promise<Response 
     if (trailer_required !== undefined) updates.trailer_required = trailer_required;
     if (itinerary !== undefined) updates.itinerary = itinerary;
     if (instructions !== undefined) updates.instructions = instructions;
+    if (addons !== undefined) updates.addons = addons;
     if (isSubcontracted !== undefined) updates.isSubcontracted = isSubcontracted;
     if (subcontractorId !== undefined) updates.subcontractorId = subcontractorId;
     if (subcontractorName !== undefined) updates.subcontractorName = subcontractorName;
@@ -995,7 +1013,7 @@ export const createExpense = async (req: Request, res: Response): Promise<Respon
     if (!user) return;
     if (!requireRole(res, user.role, ['driver'])) return;
 
-    const { category, amountCents, receiptUrl, tourId, floatId, description } = req.body;
+    const { category, amountCents, receiptUrl, tourId, floatId, description, notes } = req.body;
 
     console.log('[createExpense] Request received:', {
         category,
@@ -1092,6 +1110,7 @@ export const createExpense = async (req: Request, res: Response): Promise<Respon
                 trailerLicence,
                 driverName,
                 status: 'pending',
+                notes: notes || '',
                 createdAt: now,
                 updatedAt: now
             });
@@ -1840,3 +1859,48 @@ export const seedTourCodes = async (req: Request, res: Response): Promise<Respon
         res.status(500).json({ message: 'Failed to seed tour codes', status: 0, data: null });
     }
 };
+
+export const uploadVehicleDocument = async (req: Request, res: Response): Promise<Response | void> => {
+    const user = ensureUser(req, res);
+    if (!user) return;
+    if (!requireRole(res, user.role, ['ops', 'owner', 'tour_manager'])) return;
+
+    const { vehicleId, name, type, base64Data } = req.body;
+    if (!vehicleId || !name || !type || !base64Data) {
+        return res.status(400).json({ message: 'Missing required fields', status: 0, data: null });
+    }
+
+    const vehicle = await getDocument('vehicles', vehicleId);
+    if (!vehicle) {
+        return res.status(404).json({ message: 'Vehicle not found', status: 0, data: null });
+    }
+
+    try {
+        const pureBase64 = base64Data.replace(/^data:.*;base64,/, '');
+        const buffer = Buffer.from(pureBase64, 'base64');
+        const uint8Array = new Uint8Array(buffer);
+        const docRef = ref(storage, `vehicles/${vehicleId}/${Date.now()}_${name}`);
+        await uploadBytes(docRef, uint8Array);
+        const downloadUrl = await getDownloadURL(docRef);
+
+        const newDoc = {
+            id: createDocRef('temp').id,
+            name,
+            type,
+            url: downloadUrl,
+            createdAt: new Date().toISOString()
+        };
+
+        const existingDocs = vehicle.documents || [];
+        await updateDocument('vehicles', vehicleId, {
+            documents: [...existingDocs, newDoc],
+            updatedAt: new Date().toISOString()
+        });
+
+        res.status(201).json({ message: 'Document uploaded', status: 1, data: newDoc });
+    } catch (error) {
+        console.error('Error uploading vehicle document:', error);
+        res.status(500).json({ message: 'Failed to upload document', status: 0, data: null });
+    }
+};
+

@@ -42,7 +42,8 @@ import {
     createTourCode,
     updateTourCode,
     deleteTourCode,
-    seedTourCodes
+    seedTourCodes,
+    uploadVehicleDocument
 } from '../handlers/method';
 import { authenticate, register } from '../handlers/auth/auth';
 import { authorize } from '../handlers/auth/middleware/authentication';
@@ -99,6 +100,7 @@ router.put('/vehicles/:id', authorize, updateVehicle);
 router.get('/vehicles/:id/tours', authorize, getToursForVehicle);
 router.get('/vehicles/:id/issues', authorize, getIssuesForVehicle);
 router.get('/vehicles/:id/inspections', authorize, getInspectionsForVehicle);
+router.post('/vehicles/:id/upload-document', authorize, uploadVehicleDocument);
 router.delete('/vehicles/:id', authorize, deleteVehicle);
 
 // Trailers
